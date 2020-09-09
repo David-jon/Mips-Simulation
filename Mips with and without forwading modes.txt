@@ -1,0 +1,459 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdbool.h>
+#include <ctype.h>
+
+bool mem_check(int mem_loc,int free_time,int curr_time);
+bool reg_use_check_with_forwarding(int Reg_set[4][10],int reg_number,int free_time,int curr_time,int type,int instruction_number,int mode);
+
+int main()
+{
+    int MODE=0;
+    //Mode 1 for operand forwarding, mode 0 for normal mode
+    printf("Press 1 for operand forwarding or\nPress 0 for normal mode\n");
+    scanf("%d",&MODE);
+    if(!(MODE==0||MODE==1))
+        exit(1);
+    int i,j,temp,num,lw[30][3],beq[30][3],add[30][3],sub[30][3],sw[30][2],count_add=0,count_sub=0,count_beq=0,count_lw=0,count_sw=0;
+    char cycle_chart[6][100],instructions[6][10]={"Table", "IF&D","OF","ALU","MEM","REG"},input_instr[100][10];
+    printf("Instructions format\nADD RX RY RZ\nSUB RX RY RZ\nBEQ RX RY INT \nLW RX INT RY \nwhere [RX+number]->RY \nSW INT RX\nwhere [number]<-RX\nTaking load  store and branch instructions as 4B, others as 2B instructions\n\n Assuming instruction uses the following stages\nADD   :IF&D  OF  ALU  REG\nSUB   :IF&D  OF  ALU  REG\nBEQ   :IF&D  OF  ALU  \nLOAD  :IF&D  OF  ALU  MEM  REG\nSTORE :IF&D  OF  MEM\n\n");
+    //initilizing 2d array
+    for(i=0;i<6;i++)
+        for(j=0;j<100;j++)
+            cycle_chart[i][j]=' ';
+    printf("\nHow many instructions ?\n");
+    scanf("%d",&num);
+    if(num>100 || num<0)
+    {
+        printf("Error\n");
+        exit(2);
+    }
+    for(i=0;i<num;i++)
+    {
+        printf("Enter instruction %d\n",i+1);
+        scanf("%s",input_instr[i]);
+        if(((!strcmp(input_instr[i],"LW"))) || (!strcmp(input_instr[i],"lw")))
+        {
+            printf("Enter first register number,memory location and second register number\n");
+            scanf("%d %d %d",&lw[count_lw][0],&lw[count_lw][1],&lw[count_lw][2]);
+            count_lw++;
+        }
+        else if(((!strcmp(input_instr[i],"SW"))) || (!strcmp(input_instr[i],"sw")))
+        {
+            printf("Enter memory location and first register number\n");
+            scanf("%d %d",&sw[count_sw][0],&sw[count_sw][1]);
+            count_sw++;
+        }
+        else if((!strcmp(input_instr[i],"BEQ"))||(!strcmp(input_instr[i],"beq")))
+        {
+            printf("Enter first register number,second register number and memory location\n");
+            scanf("%d %d %d",&beq[count_beq][0],&beq[count_beq][1],&beq[count_beq][2]);
+            count_beq++;
+        }
+        else if(((!strcmp(input_instr[i],"ADD")))||((!strcmp(input_instr[i],"add"))))
+        {
+            printf("Enter first register number second register and third number\n");
+            scanf("%d %d %d",&add[count_add][0],&add[count_add][1],&add[count_add][2]);
+            count_add++;
+        }
+        else if(((!strcmp(input_instr[i],"SUB")))||((!strcmp(input_instr[i],"sub"))))
+        {
+            printf("Enter first register number and second register number\n");
+            scanf("%d %d %d",&sub[count_sub][0],&sub[count_sub][1],&sub[count_sub][2]);
+            count_sub++;
+        }
+        else
+        {
+            printf("This shouldn't happen (1)\n Exitting");
+            exit(1);
+        }
+
+    }
+    printf("You have entered\n\n\n");
+    temp=1000;
+    int temp1=0,temp2=0,temp3=0,temp4=0,temp5=0;
+    for(i=0;i<num;i++)
+    {
+        printf("%d  I%d\t",temp,i+1);
+        temp+=2;
+        if(((!strcmp(input_instr[i],"LW"))) || (!strcmp(input_instr[i],"lw"))||((!strcmp(input_instr[i],"SW"))) || (!strcmp(input_instr[i],"sw")) || (!strcmp(input_instr[i],"BEQ"))||(!strcmp(input_instr[i],"beq")))
+            temp+=2;
+        //printf("%s",input_instr[i]);
+        if(((!strcmp(input_instr[i],"ADD")))||((!strcmp(input_instr[i],"add"))))
+        {
+            printf("ADD   ");
+            printf("R%d R%d R%d\n",add[temp1][0],add[temp1][1],add[temp1][2]);
+            temp1++;
+        }
+        else if(((!strcmp(input_instr[i],"SUB")))||((!strcmp(input_instr[i],"sub"))))
+        {
+            printf("SUB   ");
+            printf("R%d R%d R%d\n",sub[temp2][0],sub[temp2][1],sub[temp2][2]);
+            temp2++;
+        }
+        else if((!strcmp(input_instr[i],"BEQ"))||(!strcmp(input_instr[i],"beq")))
+        {
+            printf("BEQ   ");
+            printf("R%d R%d [%d]\n",beq[temp3][0],beq[temp3][1],beq[temp3][2]);
+            temp3++;
+        }
+        else if(((!strcmp(input_instr[i],"LW"))) || (!strcmp(input_instr[i],"lw")))
+        {
+            printf("LOAD  ");
+            printf("R%d [%d] R%d\n",lw[temp4][0],lw[temp4][1],lw[temp4][2]);
+            temp4++;
+        }
+        else if(((!strcmp(input_instr[i],"SW"))) || (!strcmp(input_instr[i],"sw")))
+        {
+            printf("STORE \t");
+            printf("[%d] R%d\n",sw[temp5][0],sw[temp5][1],sw[temp5][2]);
+            temp5++;
+        }
+        else
+        {
+            printf("This shouldn't happen (2)\n Exitting");
+            exit(2);
+        }
+    }
+    int k,Reg_set[4][10],temp1v2=0,temp2v2=0,temp3v2=0,temp4v2=0,temp5v2=0,type;
+    temp=0,temp1=0,temp2=0,temp3=0,temp4=0,temp5=0,i=0;
+    char str[5];
+    bool beq_val=true,lw_val=true;
+
+    //initialising reg_set
+    for(i=0;i<4;i++)
+        for(j=0;j<10;j++)
+            Reg_set[i][j]=0;
+    i=0,j=0;
+    /*
+    Reg_set has 2 rows, index number locates the property of that register. 1st row contains the time at which the register will get free from use.
+    2nd row incicates the time at which the register will get freed upon by using operand forwarding
+    3rdd row indicates which instruction number is writing to it.
+    the operand forwading time is new_time=old_time-type; where,
+    for type 0 instruction (BEQ and SW ) operand forwarding to other instruction is not necessary because they don's write to register
+    for type 1 instruction (ADD and SUB) operand forwarding speeds up the the execution by saving 1 cycle
+    for type 2 instruction (LW) operand forward can speed up the execution by 2 cpu cycles
+    reg number -1 for checking refreshing all the registers
+    using type 0 instruction for refreshing all the time
+    */
+
+    for(k=0;k<=50;k++)
+    {//reg_use_check_with_forwarding(int Reg_set[4][10],int reg_number,int free_time,int curr_time,int type,int instruction_number,int mode)
+        //reg_use_check(Reg_set,0,0,k);
+        reg_use_check_with_forwarding(Reg_set,-1,0,k,0,i,0);
+        //printf("wait1 \n");
+        if((((!strcmp(input_instr[i],"ADD")))||(!strcmp(input_instr[i],"add")))&&(Reg_set[0][add[temp1][0]]==0)&&(Reg_set[0][add[temp1][1]]==0)&&(Reg_set[0][add[temp1][2]]==0))
+        {
+            //temp1 as index used is used for checking if the reg is in use.
+            //temp1 is used for access next set of same instruction type registers
+            //temp1v2 is used for checking at which time slot instr will be scheduled and also at which time
+            //register will get freed up
+                //ADD without operand forwarding
+                //Reg_set[add[temp1][0]] = 1
+                Reg_set[0][add[temp1][0]]=1;;//Register marked as use
+                temp1v2=k;
+                sprintf(str, "%d", i+1);
+                cycle_chart[1][temp1v2]=*str;
+                temp1v2++;
+                cycle_chart[2][temp1v2]=*str;
+                temp1v2++;
+                while (!(cycle_chart[3][temp1v2]==' '))
+                    temp1v2++;
+                cycle_chart[3][temp1v2] =*str;
+                temp1v2++;
+                while (!(cycle_chart[5][temp1v2]==' '))
+                    temp1v2++;
+                cycle_chart[5][temp1v2] =*str;
+                //Reg_set[add[temp1][1]] will be free at time (tempv2+1)
+                //reg_use_check(Reg_set,add[temp1][0],temp1v2+1,k);
+                //we have done +!mode to accurately plot the chart
+                reg_use_check_with_forwarding(Reg_set,add[temp1][0],temp1v2+(!MODE),k,1,i,0);
+                i++;
+                temp1++;
+        }
+        else if(MODE &&((((!strcmp(input_instr[i],"ADD")))||((!strcmp(input_instr[i],"add"))))&&reg_use_check_with_forwarding(Reg_set,add[temp1][0],0,k,1,i,1)&&reg_use_check_with_forwarding(Reg_set,add[temp1][1],0,k,1,i,1)&&reg_use_check_with_forwarding(Reg_set,add[temp1][2],0,k,1,i,1)&&(Reg_set[0][add[temp1][0]]==0)&&(Reg_set[0][add[temp1][1]]==0)&&(Reg_set[0][add[temp1][2]]==0)))
+        {
+                //ADD with operand  forwarding
+                Reg_set[0][add[temp1][0]]=1;;//Register marked as use
+                temp1v2=k;
+                sprintf(str, "%d", i+1);
+                cycle_chart[1][temp1v2]=*str;
+                temp1v2++;
+                cycle_chart[2][temp1v2]=*str;
+                temp1v2++;
+                while (!(cycle_chart[3][temp1v2]==' '))
+                    temp1v2++;
+                cycle_chart[3][temp1v2] =*str;
+                temp1v2++;
+                while (!(cycle_chart[5][temp1v2]==' '))
+                    temp1v2++;
+                cycle_chart[5][temp1v2] =*str;
+                //reg_use_check(Reg_set,add[temp1][0],temp1v2+1,k);
+                reg_use_check_with_forwarding(Reg_set,add[temp1][0],temp1v2+(!MODE),k,1,i,0);
+                i++;
+                temp1++;
+        }
+
+        else if((((!strcmp(input_instr[i],"SUB")))||((!strcmp(input_instr[i],"sub"))))&&(Reg_set[0][sub[temp2][0]]==0)&&(Reg_set[0][sub[temp2][1]]==0)&&(Reg_set[0][sub[temp2][2]]==0))
+        {
+                Reg_set[0][sub[temp2][0]] = 1;//Register marked as use
+                temp2v2=k;
+                sprintf(str, "%d", i+1);
+                cycle_chart[1][temp2v2]=*str;
+                temp2v2++;
+                cycle_chart[2][temp2v2]=*str;
+                temp2v2++;
+                while (!(cycle_chart[3][temp2v2]==' '))
+                    temp2v2++;
+                cycle_chart[3][temp2v2] =*str;
+                temp2v2++;
+                while (!(cycle_chart[5][temp2v2]==' '))
+                    temp2v2++;
+                cycle_chart[5][temp2v2] =*str;
+                //reg_use_check(Reg_set,sub[temp2][0],temp2v2+1,k);
+                reg_use_check_with_forwarding(Reg_set,sub[temp2][0],temp2v2+(!MODE),k,1,i,0);
+                i++;
+                temp2++;
+        }
+        else if(MODE &&((((!strcmp(input_instr[i],"SUB")))||((!strcmp(input_instr[i],"sub"))))&&reg_use_check_with_forwarding(Reg_set,sub[temp2][0],0,k,1,i,1)&&reg_use_check_with_forwarding(Reg_set,sub[temp2][1],0,k,1,i,1)&&reg_use_check_with_forwarding(Reg_set,sub[temp2][2],0,k,1,i,1)&&(Reg_set[0][sub[temp2][0]]==0)&&(Reg_set[0][sub[temp2][1]]==0)&&(Reg_set[0][sub[temp2][2]]==0)))
+        {
+                //Sub with forwarding
+                Reg_set[0][sub[temp2][0]] = 1;//Register marked as use
+                temp2v2=k;
+                sprintf(str, "%d", i+1);
+                cycle_chart[1][temp2v2]=*str;
+                temp2v2++;
+                cycle_chart[2][temp2v2]=*str;
+                temp2v2++;
+                while (!(cycle_chart[3][temp2v2]==' '))
+                    temp2v2++;
+                cycle_chart[3][temp2v2] =*str;
+                temp2v2++;
+                while (!(cycle_chart[5][temp2v2]==' '))
+                    temp2v2++;
+                cycle_chart[5][temp2v2] =*str;
+                //reg_use_check(Reg_set,sub[temp2][0],temp2v2+1,k);
+                reg_use_check_with_forwarding(Reg_set,sub[temp2][0],temp2v2+(!MODE),k,1,i,0);
+                i++;
+                temp2++;
+        }
+        //introduce that that memory location is not being used
+        else if((((!strcmp(input_instr[i],"BEQ")))||((!strcmp(input_instr[i],"beq"))))&&(Reg_set[0][beq[temp3][0]]==0)&&(Reg_set[0][beq[temp3][1]]==0)&&mem_check(beq[temp3][2],0,k))
+        {
+                temp3v2=k;
+                sprintf(str, "%d", i+1);
+                cycle_chart[1][temp3v2]=*str;
+                temp3v2++;
+                cycle_chart[2][temp3v2]=*str;
+                temp3v2++;
+                while (!(cycle_chart[3][temp3v2]==' '))
+                    temp3v2++;
+                cycle_chart[3][temp3v2] =*str;
+                i++;
+                temp3++;
+        }
+        else if(MODE &&((((!strcmp(input_instr[i],"BEQ")))||((!strcmp(input_instr[i],"beq"))))&&reg_use_check_with_forwarding(Reg_set,beq[temp3][0],0,k,0,i,1)&&reg_use_check_with_forwarding(Reg_set,beq[temp3][1],0,k,0,i,1)&&(Reg_set[0][beq[temp3][0]]==0)&&(Reg_set[0][beq[temp3][1]]==0)&&mem_check(beq[temp3][2],0,k)))
+        {
+                temp3v2=k;
+                sprintf(str, "%d", i+1);
+                cycle_chart[1][temp3v2]=*str;
+                temp3v2++;
+                cycle_chart[2][temp3v2]=*str;
+                temp3v2++;
+                while (!(cycle_chart[3][temp3v2]==' '))
+                    temp3v2++;
+                cycle_chart[3][temp3v2] =*str;
+                i++;
+                temp3++;
+        }
+        else if((((!strcmp(input_instr[i],"LW")))||((!strcmp(input_instr[i],"lw"))))&&(Reg_set[0][lw[temp4][0]]==0)&&(Reg_set[0][lw[temp4][2]]==0)&&mem_check(lw[temp4][1],0,k))
+        {
+                Reg_set[0][lw[temp4][2]] = 1;//Register marked as use
+                temp4v2=k;
+                sprintf(str, "%d", i+1);
+                cycle_chart[1][temp4v2]=*str;
+                temp4v2++;
+                cycle_chart[2][temp4v2]=*str;
+                temp4v2++;
+                while (!(cycle_chart[3][temp4v2]==' '))
+                    temp4v2++;
+                cycle_chart[3][temp4v2] =*str;
+                temp4v2++;
+                while (!(cycle_chart[4][temp4v2]==' '))
+                    temp4v2++;
+                cycle_chart[4][temp4v2] =*str;
+                temp4v2++;
+                while (!(cycle_chart[5][temp4v2]==' '))
+                    temp4v2++;
+                cycle_chart[5][temp4v2] =*str;
+                //reg_use_check(Reg_set,lw[temp4][2],temp4v2+1,k);
+                reg_use_check_with_forwarding(Reg_set,lw[temp4][2],temp4v2+(!MODE),k,2,i,0);
+                i++;
+                temp4++;
+        }
+        else if(MODE &&((((!strcmp(input_instr[i],"LW")))||((!strcmp(input_instr[i],"lw"))))&&(Reg_set[0][lw[temp4][0]]==0)&&reg_use_check_with_forwarding(Reg_set,lw[temp4][0],0,k,2,i,1)&&(Reg_set[0][lw[temp4][2]]==0)&&mem_check(lw[temp4][1],0,k)))
+        {
+                //LW instruction with operand forwarding
+                Reg_set[0][lw[temp4][2]] = 1;//Register marked as use
+                temp4v2=k;
+                sprintf(str, "%d", i+1);
+                cycle_chart[1][temp4v2]=*str;
+                temp4v2++;
+                cycle_chart[2][temp4v2]=*str;
+                temp4v2++;
+                while (!(cycle_chart[3][temp4v2]==' '))
+                    temp4v2++;
+                cycle_chart[3][temp4v2] =*str;
+                temp4v2++;
+                while (!(cycle_chart[4][temp4v2]==' '))
+                    temp4v2++;
+                cycle_chart[4][temp4v2] =*str;
+                temp4v2++;
+                while (!(cycle_chart[5][temp4v2]==' '))
+                    temp4v2++;
+                cycle_chart[5][temp4v2] =*str;
+                //reg_use_check(Reg_set,lw[temp4][2],temp4v2+1,k);
+                reg_use_check_with_forwarding(Reg_set,lw[temp4][2],temp4v2+(!MODE),k,2,i,0);
+                i++;
+                temp4++;
+        }
+        else if((((!strcmp(input_instr[i],"SW")))||((!strcmp(input_instr[i],"sw"))))&&(Reg_set[0][sw[temp5][1]]==0))
+        {
+                temp5v2=k;
+                sprintf(str, "%d", i+1);
+                cycle_chart[1][temp5v2]=*str;
+                temp5v2++;
+                cycle_chart[2][temp5v2]=*str;
+                temp5v2++;
+                while(!(cycle_chart[4][temp5v2]==' '))
+                    temp5v2++;
+                cycle_chart[4][temp5v2] =*str;
+                //mem_check function for resolving clashes for memory location read/write
+                mem_check(sw[temp5][0],temp5v2+(!MODE),k);
+                i++;
+                temp5++;
+        }
+        else if(MODE &&((((!strcmp(input_instr[i],"SW")))||((!strcmp(input_instr[i],"sw"))))&&reg_use_check_with_forwarding(Reg_set,sw[temp5][1],0,k,0,i,1)&&(Reg_set[0][sw[temp5][1]]==0)))
+        {
+                //SW instruction with operand forwarding
+                temp5v2=k;
+                sprintf(str, "%d", i+1);
+                cycle_chart[1][temp5v2]=*str;
+                temp5v2++;
+                cycle_chart[2][temp5v2]=*str;
+                temp5v2++;
+                while(!(cycle_chart[4][temp5v2]==' '))
+                    temp5v2++;
+                cycle_chart[4][temp5v2] =*str;
+                //mem_check function for resolving clashes for memory location read/write
+                mem_check(sw[temp5][0],temp5v2+(!MODE),k);
+                i++;
+                temp5++;
+        }//continue because in each cycle a new instruction may not start
+        else
+            continue;
+        if(i>=num)
+            break;
+    }
+    printf("\n\n\n");
+    for(i=0;i<6;i++)
+    {
+        printf("%s",instructions[i]);
+        for(j=0;j<=27;j++)
+        {
+            if(i==0)
+                printf("\tC_%d  ",j+1);
+            else
+                printf("\t%c  ",cycle_chart[i][j]);
+        }
+        printf("\n");
+    }
+
+    return 0;
+}
+bool mem_check(int mem_loc,int free_time,int curr_time)
+{
+    static int mem_array[100][2],counter=0;
+    if(free_time!=0)
+    {
+        mem_array[counter][0]=mem_loc;
+        mem_array[counter++][1]=free_time;
+    }
+
+    if(free_time==0)
+    {
+        for(int i=0;i<=counter;i++)
+        {
+            if((mem_loc==mem_array[i][0]) && (mem_array[i][1]<=curr_time))
+            {
+                mem_array[i][0]=0;
+                mem_array[i][1]=0;
+                return true;
+            }
+            if(mem_loc!=mem_array[i][0])
+                return true;
+            if((mem_loc==mem_array[i][0]) && (mem_array[i][1]>curr_time))
+                return false;
+        }
+    }
+    return true;
+}
+
+bool reg_use_check_with_forwarding(int Reg_set[4][10],int reg_number,int free_time,int curr_time,int type,int instruction_number,int mode)
+{
+    int i,j;
+    //for initializing which register will be freed upon which time
+    //2 cases for free time. if free time=0 is used to check refresh the Reg_set for reading
+    //the other case is used for setting the time at which the register will get freed
+    //Reg_set: 1st row for determining if the register is in use
+    //2nd row for determining at which time register will get freed
+    //3rd row for determining which row will get freed with operand forwarding
+    //4th row for determining which instruction is using it
+    //mode for determing operand forwarding is enabled
+    if(free_time!=0)
+    {
+        Reg_set[0][reg_number]=1;
+        Reg_set[1][reg_number]=free_time;
+        Reg_set[2][reg_number]=free_time-type;
+        Reg_set[3][reg_number]=instruction_number;
+    }
+
+    else if(free_time==0 && mode==0 && reg_number==-1)
+    {
+        for(i=0;i<10;i++)
+            if(Reg_set[1][i]<=curr_time)
+            {
+                Reg_set[0][i]=0;
+                Reg_set[1][i]=0;
+                Reg_set[2][i]=0;
+                Reg_set[3][i]=0;
+            }
+        /*printf("\n");
+        for(i=0;i<4;i++)
+        {
+            for(j=0;j<10;j++)
+                printf("%d  ",Reg_set[i][j]);
+            printf("\n");
+        }
+        printf("\n");*/
+    }
+    else if((free_time==0) && (mode=1))
+    {
+        if(Reg_set[2][reg_number]<=curr_time)
+        {
+            if(abs(Reg_set[3][reg_number]-instruction_number)<3)
+                printf("\nR%d is forwarded from I%d to I%d in cycle %d\n",reg_number,Reg_set[3][reg_number]+1,instruction_number+1,curr_time+1);
+            Reg_set[0][reg_number]=0;
+            Reg_set[1][reg_number]=0;
+            /*if(free_time>=type)
+                Reg_set[2][reg_number]=free_time-type;
+            */
+            Reg_set[2][reg_number]=0;
+            Reg_set[3][reg_number]=instruction_number;
+        }
+        else
+            return false;
+    }
+    return true;
+}
